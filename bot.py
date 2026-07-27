@@ -5,17 +5,17 @@ Kibertəhlükəsizlik Sual-Cavab Telegram Botu
 Ümumi kibertəhlükəsizlik mövzularında (parollar, fişinq, VPN, 2FA,
 zərərli proqramlar, təhlükəsiz internet istifadəsi və s.) istifadəçilərə
 ciddi, faydalı və dəqiq məlumat verir.
-
+ 
 Quraşdırma:
     pip install python-telegram-bot --upgrade
-
+ 
 İşə salmaq:
     1. Telegram-da @BotFather ilə yeni bot yaradın, TOKEN alın.
     2. Aşağıda BOT_TOKEN yerinə öz tokeninizi yazın (və ya mühit
        dəyişəni kimi verin: export BOT_TOKEN="....").
     3. python bot.py
 """
-
+ 
 import logging
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -27,15 +27,15 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
-
+ 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
-
+ 
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "BURAYA_TOKEN_YAZIN")
-
+ 
 # ---------------------------------------------------------------------
 # Bilik bazası: mövzu -> (başlıq, cavab mətni)
 # ---------------------------------------------------------------------
@@ -142,7 +142,7 @@ KNOWLEDGE_BASE = {
         ),
     },
 }
-
+ 
 MENU_KEYBOARD = [
     [InlineKeyboardButton("🔑 Parollar", callback_data="passwords")],
     [InlineKeyboardButton("📲 2FA (İki mərhələli təsdiq)", callback_data="2fa")],
@@ -153,7 +153,7 @@ MENU_KEYBOARD = [
     [InlineKeyboardButton("🧭 Təhlükəsiz gəzinti", callback_data="safe_browsing")],
     [InlineKeyboardButton("🔒 Şəxsi məlumatların qorunması", callback_data="data_privacy")],
 ]
-
+ 
 # Sadə açar sözlərə görə sərbəst mətn axtarışı
 KEYWORD_MAP = {
     "parol": "passwords",
@@ -177,8 +177,8 @@ KEYWORD_MAP = {
     "privacy": "data_privacy",
     "gizlilik": "data_privacy",
 }
-
-
+ 
+ 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
         "Salam! Bu bot kibertəhlükəsizlik mövzusunda ümumi məlumat üçün "
@@ -186,26 +186,45 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Aşağıdakı mövzulardan birini seçin və ya sualınızı birbaşa yazın."
     )
     await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(MENU_KEYBOARD))
-
-
+ 
+ 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "/start — mövzu menyusunu göstərir\n"
         "İstədiyiniz mövzu haqqında sadəcə sual yaza bilərsiniz "
         "(məsələn: 'VPN nədir?', 'parolumu necə güclü edim?')."
     )
-
-
+ 
+ 
+BACK_BUTTON = InlineKeyboardMarkup(
+    [[InlineKeyboardButton("⬅️ Menyuya qayıt", callback_data="back_to_menu")]]
+)
+ 
+ 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+ 
+    if query.data == "back_to_menu":
+        text = (
+            "Salam! Bu bot kibertəhlükəsizlik mövzusunda ümumi məlumat üçün "
+            "nəzərdə tutulub.\n\n"
+            "Aşağıdakı mövzulardan birini seçin və ya sualınızı birbaşa yazın."
+        )
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(MENU_KEYBOARD))
+        return
+ 
     topic = KNOWLEDGE_BASE.get(query.data)
     if topic:
-        await query.edit_message_text(f"*{topic['title']}*\n\n{topic['text']}", parse_mode="Markdown")
+        await query.edit_message_text(
+            f"*{topic['title']}*\n\n{topic['text']}",
+            parse_mode="Markdown",
+            reply_markup=BACK_BUTTON,
+        )
     else:
-        await query.edit_message_text("Bu mövzu tapılmadı.")
-
-
+        await query.edit_message_text("Bu mövzu tapılmadı.", reply_markup=BACK_BUTTON)
+ 
+ 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text.lower()
     matched_key = None
@@ -213,35 +232,40 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if keyword in user_text:
             matched_key = key
             break
-
+ 
     if matched_key:
         topic = KNOWLEDGE_BASE[matched_key]
-        await update.message.reply_text(f"*{topic['title']}*\n\n{topic['text']}", parse_mode="Markdown")
+        await update.message.reply_text(
+            f"*{topic['title']}*\n\n{topic['text']}",
+            parse_mode="Markdown",
+            reply_markup=BACK_BUTTON,
+        )
     else:
         await update.message.reply_text(
             "Sualınızı tam anlaya bilmədim. Aşağıdakı mövzulardan birini "
             "seçə bilərsiniz:",
             reply_markup=InlineKeyboardMarkup(MENU_KEYBOARD),
         )
-
-
+ 
+ 
 def main():
     if BOT_TOKEN == "BURAYA_TOKEN_YAZIN":
         print(
             "XƏBƏRDARLIQ: BOT_TOKEN təyin edilməyib. "
             "Mühit dəyişəni kimi verin: export BOT_TOKEN='sizin_tokeniniz'"
         )
-
+ 
     app = Application.builder().token(BOT_TOKEN).build()
-
+ 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
-
+ 
     print("Bot işə düşdü...")
     app.run_polling()
-
-
+ 
+ 
 if __name__ == "__main__":
     main()
+ 
